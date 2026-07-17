@@ -48,8 +48,8 @@ sbatch train_all.sh
 Please cite the following paper when using this repository:
 
 ```bibtex
-@article{altrabulsi2026qspirl,
-  title   = {Q-SpiRL: Quantum Spiking Reinforcement Learning for Adaptive Robot Navigation},
+@article{qspirl2026,
+  title   = {{Q-SpiRL}: Quantum Spiking Reinforcement Learning for Adaptive Robot Navigation},
   author  = {Altrabulsi, Mohamed Khair and Innan, Nouhaila and Marchisio, Alberto and Kashif, Muhammad and Shafique, Muhammad},
   journal = {arXiv preprint arXiv:2605.20801},
   year    = {2026}
