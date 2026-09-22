@@ -1,5 +1,7 @@
 # Q-SpiRL
 
+This repo is a fork of the original Q-SpiRL repo, citation at the bottom. My thanks to everyone at eBrain4Everyone and the authors of the Q-SpiRL paper for the public availability of the code!
+
 This repository contains the code for the paper **"Q-SpiRL: Quantum Spiking Reinforcement Learning for Adaptive Robot Navigation,"** accepted at the **2026 IEEE International Conference on Quantum Computing and Engineering (QCE 2026)**.
 
 Paper: https://arxiv.org/abs/2605.20801
