@@ -3,7 +3,7 @@ import numpy as np
 
 class GridEnvCells:
     def __init__(self, num_static=7, num_dynamic=1, seed=None):
-        self.W = self.H = 30
+        self.W = self.H = 40  # Grid size normal 30, test 20
         self.min_cell = np.array([0, 0], dtype=int)
         self.max_cell = np.array([self.W - 1, self.H - 1], dtype=int)
 
