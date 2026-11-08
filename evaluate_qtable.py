@@ -92,6 +92,13 @@ def get_args(argv=None):
     p.add_argument("--num_envs", type=int, default=100)
     p.add_argument("--max_steps", type=int, default=300)
     p.add_argument("--batch_size", type=int, default=128)
+    p.add_argument("--num_samples", type=int, default=1,
+                   help="Average Q-values over this many random spike encodings per "
+                        "state. Paper text: 1. models/QL.py load_from_model default: 10. "
+                        "Ignored for non-spiking (--qmlp) models.")
+    p.add_argument("--mask_invalid", action="store_true",
+                   help="Mask actions that would leave the grid before the argmax. "
+                        "Default is unmasked, like helper/misc.run_episode_qtable.")
     p.add_argument("--out", type=str, default="eval_out")
     p.add_argument("--save_qtable", action="store_true")
 
@@ -145,19 +152,25 @@ def build_qtable(args):
                            seed=args.enc_seed)
 
     states = all_states()
-    feats = []
-    for s in states:
-        f = enc.encode_state(s) if enc is not None else encode_one_hot(s)
-        feats.append(np.asarray(f, dtype=np.float32))
-    X = torch.from_numpy(np.stack(feats))
-    print(f"[qtable] encoded features: {tuple(X.shape)} (states, ...)")
-
-    outs = []
-    with torch.no_grad():
-        for i in range(0, len(X), args.batch_size):
-            q = net(X[i:i + args.batch_size])
-            outs.append(q.detach().cpu().numpy().reshape(-1, NUM_ACTIONS))
-    Q = np.concatenate(outs).reshape(STATE_DIMS + (NUM_ACTIONS,))
+    n_samples = 1 if (args.qmlp or enc is None) else max(1, args.num_samples)
+    q_sum = np.zeros((len(states), NUM_ACTIONS), dtype=np.float64)
+    for k in range(n_samples):
+        # re-encode every state each pass: the encoder RNG advances, so each pass
+        # is a fresh spike realization
+        feats = []
+        for st in states:
+            f = enc.encode_state(st) if enc is not None else encode_one_hot(st)
+            feats.append(np.asarray(f, dtype=np.float32))
+        X = torch.from_numpy(np.stack(feats))
+        outs = []
+        with torch.no_grad():
+            for i in range(0, len(X), args.batch_size):
+                q = net(X[i:i + args.batch_size])
+                outs.append(q.detach().cpu().numpy().reshape(-1, NUM_ACTIONS))
+        q_sum += np.concatenate(outs)
+        print(f"[qtable] encoding sample {k + 1}/{n_samples} done "
+              f"(features {tuple(X.shape)})")
+    Q = (q_sum / n_samples).astype(np.float32).reshape(STATE_DIMS + (NUM_ACTIONS,))
     return Q
 
 
@@ -223,7 +236,7 @@ def make_env(args):
     return env
 
 
-def greedy_episode(env, Q, seed, max_steps):
+def greedy_episode(env, Q, seed, max_steps, mask_invalid=False):
     state = env.reset(seed=seed)
     lstar = shortest_path_len(env.static_obstacles, env.start_cell, env.terminal_cell,
                               env.W, env.H)
@@ -231,7 +244,12 @@ def greedy_episode(env, Q, seed, max_steps):
     actions = []
     done, info, steps = False, {}, 0
     while not done and steps < max_steps:
-        a = int(np.argmax(Q[state[0] - 1, state[1], state[2] - 1, state[3] - 1]))
+        q = Q[state[0] - 1, state[1], state[2] - 1, state[3] - 1]
+        if mask_invalid:
+            valid = env.get_valid_actions()
+            if valid.any():
+                q = np.where(valid, q, -np.inf)
+        a = int(np.argmax(q))
         state, _, done, info = env.step(a)
         actions.append(a)
         positions.append(env.pos.copy())
@@ -261,7 +279,7 @@ def evaluate(Q, args):
     env = make_env(args)
     rows = []
     for seed in range(args.seed_start, args.seed_start + args.num_envs):
-        rows.append(greedy_episode(env, Q, seed, args.max_steps))
+        rows.append(greedy_episode(env, Q, seed, args.max_steps, args.mask_invalid))
     return rows
 
 
@@ -300,7 +318,8 @@ def print_summary(s, args):
     print(f" Greedy Q-table evaluation: {s['n_envs']} held-out envs, seeds "
           f"{args.seed_start}..{args.seed_start + args.num_envs - 1}, "
           f"{args.grid_size}x{args.grid_size}, ns={args.num_static}, nd={args.num_dynamic}, "
-          f"diag={'yes' if args.with_diag else 'no'}")
+          f"diag={'yes' if args.with_diag else 'no'}, "
+          f"masked={'yes' if args.mask_invalid else 'no'}")
     print("=" * 72)
     print(f"  Success rate (SR) : {s['SR']:.3f} +/- {s['SR_se']:.3f}")
     print(f"  SPL               : {s['SPL']:.4f} +/- {s['SPL_se']:.4f}")

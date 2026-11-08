@@ -1,0 +1,50 @@
+{
+  "args": {
+    "checkpoint": "runs/fix_q8_g20_seed3/models/last_qmlp=False_quantum=True_qubits=8_T=10_maxFreq=100.0_dt=0.1_memtau=0.04_syntau=0.01_ns=6_nd=1.pth",
+    "qtable": null,
+    "qmlp": false,
+    "quantum": true,
+    "qubits": 8,
+    "num_layers": 3,
+    "num_actions": 5,
+    "mem_tau": 0.04,
+    "syn_tau": 0.01,
+    "type": "mean",
+    "input_size": 29,
+    "max_freq": 100.0,
+    "num_timesteps": 10,
+    "dt": 0.1,
+    "bg_freq": 0.0,
+    "noise_std": 0.0,
+    "enc_seed": 42,
+    "grid_size": 20,
+    "num_static": 6,
+    "num_dynamic": 1,
+    "with_diag": false,
+    "seed_start": 2000,
+    "num_envs": 100,
+    "max_steps": 300,
+    "batch_size": 128,
+    "out": "runs/fix_q8_g20_seed3/eval",
+    "save_qtable": true
+  },
+  "summary": {
+    "n_envs": 100,
+    "n_infeasible_excluded": 0,
+    "SR": 0.74,
+    "SR_se": 0.04386342439892262,
+    "SPL": 0.6699142404877487,
+    "SPL_se": 0.04033326386090926,
+    "PL_m": 17.65863554520869,
+    "PL_m_se": 0.16318204680691958,
+    "TR": 0.3915922608885995,
+    "TR_se": 0.021857138346830274,
+    "outcomes": {
+      "goal": 74,
+      "static": 5,
+      "dynamic": 4,
+      "out_of_bounds": 17,
+      "timeout": 0
+    }
+  }
+}
