@@ -39,6 +39,7 @@ env_params = {
     "num_static": args.num_static,
     "num_dynamic": args.num_dynamic,
     "seed": args.env_seed,
+    "grid_size": args.grid_size
 }
 env_ = GridEnvCells(**env_params)
 # ---- model ----
@@ -49,7 +50,7 @@ print(f"[Encoder] Effective spikes per channel ~ {effective_rate:.2f}")
 net_params = {
     "input_size": args.input_size,
     "hidden_size": 30 if not args.quantum else 35,
-    "num_layers": 3,
+    "num_layers": args.num_layers,
     "num_actions": args.num_actions,
     "qubits": args.qubits,
 }

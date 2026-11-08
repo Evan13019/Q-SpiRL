@@ -2,8 +2,9 @@ import numpy as np
 
 
 class GridEnvCells:
-    def __init__(self, num_static=7, num_dynamic=1, seed=None):
-        self.W = self.H = 40  # Grid size normal 30, test 20
+    def __init__(self, num_static=7, num_dynamic=1, seed=None, grid_size=20):
+        self.use_diag = True
+        self.W = self.H = grid_size  
         self.min_cell = np.array([0, 0], dtype=int)
         self.max_cell = np.array([self.W - 1, self.H - 1], dtype=int)
 
@@ -14,7 +15,8 @@ class GridEnvCells:
 
         # Start/terminal cells (fixed as in paper)
         self.start_cell = np.array([1, 1], dtype=int)
-        self.terminal_cell = np.array([29, 29], dtype=int)
+        self.terminal_cell = np.array([self.W - 1, self.H - 1], dtype=int) # now changes with height and width of grid
+        assert self._in_bounds(self.terminal_cell) # raise error if immposibble
 
         # Robot heading (float, radians)
         self.heading = 0.0
@@ -210,10 +212,10 @@ class GridEnvCells:
             self.static_obstacles = self._sample_cells(self.num_static, forbidden)
             forbidden |= set(map(tuple, self.static_obstacles))
             # 50% chance to have static obstacle in (n,n) blocking diogonal
-            # let n  be random number from 1 to 27
-            n = self.rng.integers(1, 28)
+            # let n  be random number from 1 to 2 less than the size of grid
+            n = self.rng.integers(1, self.W - 2)
             diag_cell = (self.start_cell[0] + n, self.start_cell[1] + n)
-            if diag_cell not in forbidden and self.rng.random() < 0.9:
+            if diag_cell not in forbidden and self.rng.random() < 0.9 and self.use_diag: # if the diagonal is used AI
                 self.static_obstacles = np.vstack([self.static_obstacles, diag_cell])
                 forbidden.add(diag_cell)
         else:

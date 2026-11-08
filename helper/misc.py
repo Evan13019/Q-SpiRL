@@ -107,6 +107,7 @@ def parse_args():
     p.add_argument("--num_static", type=int, default=10)
     p.add_argument("--num_dynamic", type=int, default=1)
     p.add_argument("--env_seed", type=int, default=1)
+    p.add_argument("--grid_size", type=int, default=20)
 
     # encoder (used when qmlp == False)
     # NOTE: With dt=0.01 and max_freq=80, spike_prob = 1 - exp(-80 * 0.01) ≈ 0.55
