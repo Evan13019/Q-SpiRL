@@ -25,25 +25,27 @@
     "num_envs": 100,
     "max_steps": 300,
     "batch_size": 128,
+    "num_samples": 1,
+    "mask_invalid": true,
     "out": "runs/fix_q8_g20_seed1/eval",
     "save_qtable": true
   },
   "summary": {
     "n_envs": 100,
     "n_infeasible_excluded": 0,
-    "SR": 0.83,
-    "SR_se": 0.037563279941985904,
-    "SPL": 0.7733149957725439,
-    "SPL_se": 0.03540158887656063,
-    "PL_m": 17.097008548513163,
-    "PL_m_se": 0.09301464836346761,
-    "TR": 0.35565519128641176,
-    "TR_se": 0.015772182863624078,
+    "SR": 0.95,
+    "SR_se": 0.021794494717703377,
+    "SPL": 0.8729344469249888,
+    "SPL_se": 0.021169811455938055,
+    "PL_m": 17.40620282307016,
+    "PL_m_se": 0.16241024670184473,
+    "TR": 0.3636909726528787,
+    "TR_se": 0.014427690175016918,
     "outcomes": {
-      "goal": 83,
-      "static": 3,
+      "goal": 95,
+      "static": 4,
       "dynamic": 1,
-      "out_of_bounds": 13,
+      "out_of_bounds": 0,
       "timeout": 0
     }
   }
