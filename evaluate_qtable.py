@@ -1,4 +1,5 @@
 # written by claude
+#!/usr/bin/env python3
 """
 evaluate_qtable.py -- Q-table conversion + deterministic evaluation for Q-SpiRL.
 
@@ -54,7 +55,7 @@ PATH_SCALE = 24.6 / np.linalg.norm(np.array([28.0, 28.0]))
 # --------------------------------------------------------------------------
 # Arguments
 # --------------------------------------------------------------------------
-def get_args(argv=None):
+def make_parser():
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     src = p.add_mutually_exclusive_group(required=True)
@@ -102,7 +103,11 @@ def get_args(argv=None):
     p.add_argument("--out", type=str, default="eval_out")
     p.add_argument("--save_qtable", action="store_true")
 
-    args, unknown = p.parse_known_args(argv)
+    return p
+
+
+def get_args(argv=None, parser=None):
+    args, unknown = (parser or make_parser()).parse_known_args(argv)
     if unknown:
         print(f"[info] ignoring flags not used by evaluation: {' '.join(unknown)}")
     return args
@@ -117,9 +122,9 @@ def all_states():
                                            range(1, 9), range(1, 9))), dtype=np.float32)
 
 
-def build_qtable(args):
+def load_net(args):
+    """Build the network exactly as train.py does and load the checkpoint."""
     import torch
-    from helper.encode import freq_encoder, encode_one_hot
     from models.vanilla_models import QMLP, QSNN
     from models.quantum_models import HybridMLP, HybridSNN
 
@@ -144,34 +149,52 @@ def build_qtable(args):
     net = mod(**net_params)
     net.load_state_dict(torch.load(args.checkpoint, map_location="cpu"))
     net.eval()
+    return net
 
-    enc = None
-    if not args.qmlp:
-        enc = freq_encoder(max_freq=args.max_freq, num_timesteps=args.num_timesteps,
-                           dt=args.dt, bg_freq=args.bg_freq, noise_std=args.noise_std,
-                           seed=args.enc_seed)
 
-    states = all_states()
+def make_encoder(args):
+    """Spike encoder for SNN models (None for --qmlp models)."""
+    if args.qmlp:
+        return None
+    from helper.encode import freq_encoder
+    return freq_encoder(max_freq=args.max_freq, num_timesteps=args.num_timesteps,
+                        dt=args.dt, bg_freq=args.bg_freq, noise_std=args.noise_std,
+                        seed=args.enc_seed)
+
+
+def encode_all_states(enc):
+    """Encode all 2,560 states once (one realization of the spike encoder)."""
+    import torch
+    from helper.encode import encode_one_hot
+    feats = []
+    for st in all_states():
+        f = enc.encode_state(st) if enc is not None else encode_one_hot(st)
+        feats.append(np.asarray(f, dtype=np.float32))
+    return torch.from_numpy(np.stack(feats))
+
+
+def qtable_from_net(net, X, batch_size=128):
+    """Run the (encoded) states through the network -> Q-table (8,5,8,8,5)."""
+    import torch
+    outs = []
+    with torch.no_grad():
+        for i in range(0, len(X), batch_size):
+            q = net(X[i:i + batch_size])
+            outs.append(q.detach().cpu().numpy().reshape(-1, NUM_ACTIONS))
+    return np.concatenate(outs).reshape(STATE_DIMS + (NUM_ACTIONS,))
+
+
+def build_qtable(args):
+    net = load_net(args)
+    enc = make_encoder(args)
     n_samples = 1 if (args.qmlp or enc is None) else max(1, args.num_samples)
-    q_sum = np.zeros((len(states), NUM_ACTIONS), dtype=np.float64)
+    q_sum = np.zeros(STATE_DIMS + (NUM_ACTIONS,), dtype=np.float64)
     for k in range(n_samples):
-        # re-encode every state each pass: the encoder RNG advances, so each pass
-        # is a fresh spike realization
-        feats = []
-        for st in states:
-            f = enc.encode_state(st) if enc is not None else encode_one_hot(st)
-            feats.append(np.asarray(f, dtype=np.float32))
-        X = torch.from_numpy(np.stack(feats))
-        outs = []
-        with torch.no_grad():
-            for i in range(0, len(X), args.batch_size):
-                q = net(X[i:i + args.batch_size])
-                outs.append(q.detach().cpu().numpy().reshape(-1, NUM_ACTIONS))
-        q_sum += np.concatenate(outs)
-        print(f"[qtable] encoding sample {k + 1}/{n_samples} done "
-              f"(features {tuple(X.shape)})")
-    Q = (q_sum / n_samples).astype(np.float32).reshape(STATE_DIMS + (NUM_ACTIONS,))
-    return Q
+        # each pass re-encodes every state with fresh spikes (the encoder RNG advances)
+        X = encode_all_states(enc)
+        q_sum += qtable_from_net(net, X, args.batch_size)
+        print(f"[qtable] encoding sample {k + 1}/{n_samples} done (features {tuple(X.shape)})")
+    return (q_sum / n_samples).astype(np.float32)
 
 
 # --------------------------------------------------------------------------
@@ -219,7 +242,7 @@ def make_env(args):
     os.environ["GRID_SIZE"] = str(args.grid_size)   # read by the edited env.py
     from env import GridEnvCells
     env = GridEnvCells(num_static=args.num_static, num_dynamic=args.num_dynamic,
-                       seed=args.seed_start)
+                       seed=args.seed_start, grid_size=args.grid_size)
     if env.W != args.grid_size:
         sys.exit(f"[error] env.py built a {env.W}x{env.H} grid but --grid_size is "
                  f"{args.grid_size}. Apply the GRID_SIZE edit to env.py first.")
